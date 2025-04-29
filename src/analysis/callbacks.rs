@@ -1,0 +1,49 @@
+use std::path::PathBuf;
+
+use log::info;
+use rustc_driver::Compilation;
+use rustc_interface::interface;
+use rustc_interface::Queries;
+use rustc_middle::ty::TyCtxt;
+
+use super::hirvisitor::HirVisitor;
+
+pub struct RfocxtCallbacks {
+    pub source_name: String,
+    pub crate_path: PathBuf,
+}
+
+impl RfocxtCallbacks {
+    pub fn new(crate_path: PathBuf) -> Self {
+        Self {
+            source_name: String::new(),
+            crate_path: crate_path,
+        }
+    }
+
+    fn run_analysis<'tcx, 'compiler>(&mut self, tcx: TyCtxt<'tcx>) {
+        let hir_map = tcx.hir();
+        let mut visitor = HirVisitor::new(tcx, hir_map);
+        hir_map.walk_toplevel_module(&mut visitor);
+    }
+}
+
+impl rustc_driver::Callbacks for RfocxtCallbacks {
+    fn config(&mut self, config: &mut interface::Config) {
+        self.source_name = format!("{:?}", config.input.source_name());
+        config.crate_cfg.push("rfocxt".to_string());
+        info!("Source file: {}", self.source_name);
+    }
+
+    fn after_expansion<'tcx>(
+        &mut self,
+        _compiler: &interface::Compiler,
+        _queries: &'tcx Queries<'tcx>,
+    ) -> Compilation {
+        _queries
+            .global_ctxt()
+            .unwrap()
+            .enter(|tcx| self.run_analysis(tcx));
+        Compilation::Continue
+    }
+}
