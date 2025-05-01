@@ -4,17 +4,15 @@ extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_session;
 
-use std::path::PathBuf;
-use std::{env, process::exit};
-
 use rfocxt::analysis::callbacks::RfocxtCallbacks;
+use rfocxt::utils::compile_time_sysroot;
 use rustc_errors::emitter::HumanReadableErrorType;
 use rustc_errors::ColorConfig;
 use rustc_session::config::ErrorOutputType;
 use rustc_session::EarlyDiagCtxt;
-
-use rfocxt::utils::compile_time_sysroot;
 use simplelog::{ConfigBuilder, TermLogger};
+use std::path::PathBuf;
+use std::{env, process::exit};
 use time::UtcOffset;
 
 fn main() {

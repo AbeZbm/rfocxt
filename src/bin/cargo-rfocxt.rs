@@ -1,13 +1,12 @@
+use log::error;
+use rfocxt::utils::compile_time_sysroot;
+use simplelog::{ConfigBuilder, TermLogger};
 use std::{
     env,
     ffi::OsString,
     path::Path,
     process::{exit, Command},
 };
-
-use log::error;
-use rfocxt::utils::compile_time_sysroot;
-use simplelog::{ConfigBuilder, TermLogger};
 use time::UtcOffset;
 
 const CARGO_RFOCXT_HELP: &str = r#"Generate focal context for rust program

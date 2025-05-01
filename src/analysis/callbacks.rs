@@ -1,12 +1,15 @@
-use std::path::PathBuf;
-
 use log::info;
 use rustc_driver::Compilation;
 use rustc_interface::interface;
 use rustc_interface::Queries;
 use rustc_middle::ty::TyCtxt;
+use std::fs;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
-use super::hirvisitor::HirVisitor;
+use super::hir_visitor::HirVisitor;
+use super::parse_context::ParseContext;
 
 pub struct RfocxtCallbacks {
     pub source_name: String,
@@ -23,8 +26,19 @@ impl RfocxtCallbacks {
 
     fn run_analysis<'tcx, 'compiler>(&mut self, tcx: TyCtxt<'tcx>) {
         let hir_map = tcx.hir();
-        let mut visitor = HirVisitor::new(tcx, hir_map);
+        let mut visitor = HirVisitor::new(tcx, hir_map, self.crate_path.clone());
         hir_map.walk_toplevel_module(&mut visitor);
+        let mod_contexts = visitor.get_complete_mod_contexts();
+        // println!("hir_visitor\n {:#?}", mod_contexts);
+
+        let output_path = self.crate_path.join("rfocxt_new/context.txt");
+        fs::create_dir_all(output_path.parent().unwrap()).unwrap();
+        let mut file = File::create(&output_path).unwrap();
+        file.write_all(format!("{:#?}", mod_contexts).as_bytes())
+            .unwrap();
+
+        let parse_context = ParseContext::new(self.crate_path.clone(), &mod_contexts);
+        parse_context.parse_context();
     }
 }
 
