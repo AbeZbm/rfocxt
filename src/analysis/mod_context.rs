@@ -194,6 +194,7 @@ impl_eq_cmp!(TraitAliasItem);
 
 #[derive(Debug, Clone)]
 pub struct ImplItem {
+    pub name: String,
     pub struct_name: String,
     pub trait_name: Option<String>,
     pub codes: String,
@@ -204,49 +205,7 @@ pub struct ImplItem {
     pub applications: BTreeSet<String>,
 }
 
-impl PartialEq for ImplItem {
-    fn eq(&self, other: &ImplItem) -> bool {
-        self.struct_name == other.struct_name && self.trait_name == other.trait_name
-    }
-}
-
-impl PartialOrd for ImplItem {
-    fn partial_cmp(&self, other: &ImplItem) -> Option<Ordering> {
-        if self.struct_name < other.struct_name {
-            Some(Ordering::Less)
-        } else if self.struct_name == other.struct_name {
-            if self.trait_name < other.trait_name {
-                Some(Ordering::Less)
-            } else if self.trait_name == other.trait_name {
-                Some(Ordering::Equal)
-            } else {
-                Some(Ordering::Greater)
-            }
-        } else {
-            Some(Ordering::Greater)
-        }
-    }
-}
-
-impl Eq for ImplItem {}
-
-impl Ord for ImplItem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.struct_name < other.struct_name {
-            Ordering::Less
-        } else if self.struct_name == other.struct_name {
-            if self.trait_name < other.trait_name {
-                Ordering::Less
-            } else if self.trait_name == other.trait_name {
-                Ordering::Equal
-            } else {
-                Ordering::Greater
-            }
-        } else {
-            Ordering::Greater
-        }
-    }
-}
+impl_eq_cmp_unique!(ImplItem);
 
 #[derive(Debug, Clone)]
 pub struct ModContext {
@@ -288,7 +247,7 @@ impl ModContext {
         }
     }
 
-    pub fn add_use(&mut self, source_info: SourceInfo) {
+    pub fn add_use(&mut self, source_info: SourceInfo, codes: String) {
         if source_info.get_string() == "" {
             return;
         }
@@ -297,7 +256,6 @@ impl ModContext {
                 return;
             }
         }
-        let codes = source_info.get_string();
         info!("Visiting use: {}", codes);
         let use_item = UseItem {
             codes: codes,
@@ -306,8 +264,7 @@ impl ModContext {
         self.uses.insert(use_item);
     }
 
-    pub fn add_static(&mut self, source_info: SourceInfo) {
-        let codes = source_info.get_string();
+    pub fn add_static(&mut self, source_info: SourceInfo, codes: String) {
         info!("Visiting static: {}", codes);
         let static_item = StaticItem {
             codes: codes,
@@ -316,8 +273,7 @@ impl ModContext {
         self.statics.insert(static_item);
     }
 
-    pub fn add_const(&mut self, source_info: SourceInfo) {
-        let codes = source_info.get_string();
+    pub fn add_const(&mut self, source_info: SourceInfo, codes: String) {
         info!("Visiting const: {}", codes);
         let const_item = ConstItem {
             codes: codes,
@@ -331,8 +287,7 @@ impl ModContext {
         self.fns.insert(fn_item);
     }
 
-    pub fn add_macro(&mut self, source_info: SourceInfo) {
-        let codes = source_info.get_string();
+    pub fn add_macro(&mut self, source_info: SourceInfo, codes: String) {
         info!("Visiting macro: {}", codes);
         let macro_item = MacroItem {
             codes: codes,
@@ -341,8 +296,7 @@ impl ModContext {
         self.macors.insert(macro_item);
     }
 
-    pub fn add_ty_alias(&mut self, source_info: SourceInfo) {
-        let codes = source_info.get_string();
+    pub fn add_ty_alias(&mut self, source_info: SourceInfo, codes: String) {
         info!("Visiting type alias: {}", codes);
         let ty_alias_item = TyAliasItem {
             codes: codes,
@@ -351,8 +305,7 @@ impl ModContext {
         self.ty_aliases.insert(ty_alias_item);
     }
 
-    pub fn add_opaque_ty(&mut self, source_info: SourceInfo) {
-        let codes = source_info.get_string();
+    pub fn add_opaque_ty(&mut self, source_info: SourceInfo, codes: String) {
         info!("Visiting opaque type: {}", codes);
         let opaque_ty_item = OpaqueTyItem {
             codes: codes,
@@ -381,8 +334,7 @@ impl ModContext {
         self.traits.insert(trait_item);
     }
 
-    pub fn add_trait_alias(&mut self, source_info: SourceInfo) {
-        let codes = source_info.get_string();
+    pub fn add_trait_alias(&mut self, source_info: SourceInfo, codes: String) {
         info!("Visiting trait alias: {}", codes);
         let trait_alias_item = TraitAliasItem {
             codes: codes,

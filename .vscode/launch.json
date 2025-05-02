@@ -1,0 +1,101 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'rfocxt'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=rfocxt"
+                ],
+                "filter": {
+                    "name": "rfocxt",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'cargo-rfocxt'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=cargo-rfocxt",
+                    "--package=rfocxt"
+                ],
+                "filter": {
+                    "name": "cargo-rfocxt",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'cargo-rfocxt'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=cargo-rfocxt",
+                    "--package=rfocxt"
+                ],
+                "filter": {
+                    "name": "cargo-rfocxt",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'rfocxt'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rfocxt",
+                    "--package=rfocxt"
+                ],
+                "filter": {
+                    "name": "rfocxt",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'rfocxt'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=rfocxt",
+                    "--package=rfocxt"
+                ],
+                "filter": {
+                    "name": "rfocxt",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

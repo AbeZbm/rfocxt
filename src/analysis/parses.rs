@@ -23,7 +23,11 @@ use std::collections::BTreeSet;
 
 use super::expr_visitor::ExprVisitor;
 
-pub fn recursively_parse_ty<'tcx>(tcx: &'tcx TyCtxt, ty: &Ty, ty_strings: &mut BTreeSet<String>) {
+pub fn recursively_parse_ty<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    ty: &Ty<'tcx>,
+    ty_strings: &mut BTreeSet<String>,
+) {
     let ty = ty.peel_refs();
     match ty.kind {
         TyKind::InferDelegation(def_id, _) => {
@@ -78,12 +82,16 @@ pub fn recursively_parse_ty<'tcx>(tcx: &'tcx TyCtxt, ty: &Ty, ty_strings: &mut B
                 parse_path(tcx, &path, ty_strings);
             }
         }
+        TyKind::Pat(ty, pat) => {
+            recursively_parse_ty(tcx, &ty, ty_strings);
+            recursively_parse_pat(tcx, &tcx.hir(), &pat, ty_strings);
+        }
         _ => {}
     }
 }
 
-pub fn recursively_parse_pat<'tcx>(
-    tcx: &TyCtxt<'tcx>,
+pub fn recursively_parse_pat<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
     hir_map: &Map<'tcx>,
     pat: &Pat<'tcx>,
     ty_strings: &mut BTreeSet<String>,
@@ -154,8 +162,8 @@ pub fn recursively_parse_pat<'tcx>(
     }
 }
 
-pub fn parse_body<'tcx>(
-    tcx: &TyCtxt<'tcx>,
+pub fn parse_body<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
     hir_map: &Map<'tcx>,
     body: &'tcx Body,
     ty_strings: &mut BTreeSet<String>,
@@ -164,7 +172,7 @@ pub fn parse_body<'tcx>(
         recursively_parse_pat(tcx, hir_map, param.pat, ty_strings);
     }
 
-    error!("{:#?}", tcx.typeck(body.id().hir_id.owner));
+    // error!("{:#?}", tcx.typeck(body.id().hir_id.owner));
     let mut expr_visitor = ExprVisitor::new(
         tcx.clone(),
         hir_map.clone(),
@@ -196,9 +204,9 @@ pub fn parse_body<'tcx>(
     // });
 }
 
-pub fn parse_generic_param<'tcx>(
-    tcx: &TyCtxt,
-    generic_param: &GenericParam,
+pub fn parse_generic_param<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    generic_param: &GenericParam<'tcx>,
     ty_strings: &mut BTreeSet<String>,
 ) {
     match generic_param.kind {
@@ -214,9 +222,9 @@ pub fn parse_generic_param<'tcx>(
     }
 }
 
-pub fn parse_where_predicate<'tcx>(
-    tcx: &'tcx TyCtxt,
-    where_predicate: &WherePredicate,
+pub fn parse_where_predicate<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    where_predicate: &WherePredicate<'tcx>,
     ty_strings: &mut BTreeSet<String>,
 ) {
     match where_predicate {
@@ -235,10 +243,34 @@ pub fn parse_where_predicate<'tcx>(
     }
 }
 
-pub fn parse_path<'tcx>(tcx: &'tcx TyCtxt, path: &Path, ty_strings: &mut BTreeSet<String>) {
+pub fn parse_path<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    path: &Path<'tcx>,
+    ty_strings: &mut BTreeSet<String>,
+) {
     let res = path.res;
     match res {
         Res::Def(_, def_id) => {
+            let crate_name = tcx.crate_name(def_id.krate).to_string();
+            let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
+            def_str = crate_name + &def_str;
+            ty_strings.insert(def_str);
+        }
+        Res::SelfTyParam { trait_: def_id } => {
+            let crate_name = tcx.crate_name(def_id.krate).to_string();
+            let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
+            def_str = crate_name + &def_str;
+            ty_strings.insert(def_str);
+        }
+        Res::SelfTyAlias {
+            alias_to: def_id, ..
+        } => {
+            let crate_name = tcx.crate_name(def_id.krate).to_string();
+            let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
+            def_str = crate_name + &def_str;
+            ty_strings.insert(def_str);
+        }
+        Res::SelfCtor(def_id) => {
             let crate_name = tcx.crate_name(def_id.krate).to_string();
             let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
             def_str = crate_name + &def_str;
@@ -248,7 +280,11 @@ pub fn parse_path<'tcx>(tcx: &'tcx TyCtxt, path: &Path, ty_strings: &mut BTreeSe
     }
 }
 
-pub fn parse_q_path<'tcx>(tcx: &'tcx TyCtxt, q_path: &QPath, ty_strings: &mut BTreeSet<String>) {
+pub fn parse_q_path<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    q_path: &QPath<'tcx>,
+    ty_strings: &mut BTreeSet<String>,
+) {
     match q_path {
         QPath::Resolved(inner_ty, path) => {
             if let Some(inner_ty) = inner_ty {
@@ -257,6 +293,26 @@ pub fn parse_q_path<'tcx>(tcx: &'tcx TyCtxt, q_path: &QPath, ty_strings: &mut BT
             let res = path.res;
             match res {
                 Res::Def(_, def_id) => {
+                    let crate_name = tcx.crate_name(def_id.krate).to_string();
+                    let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
+                    def_str = crate_name + &def_str;
+                    ty_strings.insert(def_str);
+                }
+                Res::SelfTyParam { trait_: def_id } => {
+                    let crate_name = tcx.crate_name(def_id.krate).to_string();
+                    let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
+                    def_str = crate_name + &def_str;
+                    ty_strings.insert(def_str);
+                }
+                Res::SelfTyAlias {
+                    alias_to: def_id, ..
+                } => {
+                    let crate_name = tcx.crate_name(def_id.krate).to_string();
+                    let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
+                    def_str = crate_name + &def_str;
+                    ty_strings.insert(def_str);
+                }
+                Res::SelfCtor(def_id) => {
                     let crate_name = tcx.crate_name(def_id.krate).to_string();
                     let mut def_str = tcx.def_path(def_id).to_string_no_crate_verbose();
                     def_str = crate_name + &def_str;
@@ -272,7 +328,11 @@ pub fn parse_q_path<'tcx>(tcx: &'tcx TyCtxt, q_path: &QPath, ty_strings: &mut BT
     }
 }
 
-pub fn parse_fn_decl<'tcx>(tcx: &'tcx TyCtxt, fn_decl: &FnDecl, ty_strings: &mut BTreeSet<String>) {
+pub fn parse_fn_decl<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    fn_decl: &FnDecl<'tcx>,
+    ty_strings: &mut BTreeSet<String>,
+) {
     for input in fn_decl.inputs.iter() {
         recursively_parse_ty(tcx, input, ty_strings);
     }
@@ -281,9 +341,9 @@ pub fn parse_fn_decl<'tcx>(tcx: &'tcx TyCtxt, fn_decl: &FnDecl, ty_strings: &mut
     }
 }
 
-pub fn parse_variant<'tcx>(
-    tcx: &'tcx TyCtxt,
-    variant: &Variant,
+pub fn parse_variant<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    variant: &Variant<'tcx>,
     ty_strings: &mut BTreeSet<String>,
 ) {
     match variant.data {
@@ -301,9 +361,9 @@ pub fn parse_variant<'tcx>(
     }
 }
 
-pub fn parse_variant_data<'tcx>(
-    tcx: &'tcx TyCtxt,
-    variant_data: &VariantData,
+pub fn parse_variant_data<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    variant_data: &VariantData<'tcx>,
     ty_strings: &mut BTreeSet<String>,
 ) {
     match variant_data {
@@ -321,9 +381,9 @@ pub fn parse_variant_data<'tcx>(
     }
 }
 
-pub fn parse_generic_bound<'tcx>(
-    tcx: &'tcx TyCtxt,
-    generic_bound: &GenericBound,
+pub fn parse_generic_bound<'a, 'tcx>(
+    tcx: &'a TyCtxt<'tcx>,
+    generic_bound: &GenericBound<'tcx>,
     ty_strings: &mut BTreeSet<String>,
 ) {
     match generic_bound {

@@ -21,12 +21,12 @@ use crate::analysis::source_info::SourceInfo;
 use log::error;
 use log::info;
 use log::warn;
+use rustc_ast::ast::AttrKind;
 use rustc_hir::def::Res;
 use rustc_hir::intravisit::Visitor;
 use rustc_hir::GenericBound;
 use rustc_hir::ImplItemKind;
 use rustc_hir::ImplItemRef;
-use rustc_hir::IsAuto;
 use rustc_hir::Item;
 use rustc_hir::ItemKind;
 use rustc_hir::QPath;
@@ -181,17 +181,39 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
     }
 
     fn visit_item(&mut self, i: &'tcx Item<'tcx>) -> Self::Result {
+        // println!("{:#?}", i);
+        // let hir_id = self.tcx.local_def_id_to_hir_id(i.item_id().owner_id.def_id);
+        let hir_id = i.item_id().hir_id();
+        let attrs = self.hir_map.attrs(hir_id);
+        error!("{:?}: {:#?}", hir_id, attrs);
+        let mut attrs_string = String::new();
+        for attr in attrs {
+            if let AttrKind::Normal(normal_attr) = &attr.kind {
+                let attr_source =
+                    SourceInfo::from_span(normal_attr.item.span(), self.tcx.sess.source_map());
+                attrs_string = attrs_string + &attr_source.get_string();
+            }
+            // let attr_item = attr.get_normal_item();
+            // attrs_string = attrs_string + &format!("{:?}", attr_item) + "\n";
+        }
         match i.kind {
             ItemKind::Use(..) => {
                 let use_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                self.mod_contexts.last_mut().unwrap().add_use(use_source);
-            }
-            ItemKind::Static(ty, _, body_id) => {
-                let static_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = use_source.get_string();
+                codes = attrs_string + &codes;
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
-                    .add_static(static_source);
+                    .add_use(use_source, codes);
+            }
+            ItemKind::Static(ty, _, body_id) => {
+                let static_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = static_source.get_string();
+                codes = attrs_string + &codes;
+                self.mod_contexts
+                    .last_mut()
+                    .unwrap()
+                    .add_static(static_source, codes);
 
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 recursively_parse_ty(&self.tcx, &ty, &mut ty_strings);
@@ -204,10 +226,12 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
             }
             ItemKind::Const(ty, generics, body_id) => {
                 let const_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = const_source.get_string();
+                codes = attrs_string + &codes;
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
-                    .add_const(const_source);
+                    .add_const(const_source, codes);
 
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 recursively_parse_ty(&self.tcx, &ty, &mut ty_strings);
@@ -230,7 +254,8 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 fn_name = self.tcx.crate_name(def_id.krate).to_string() + &fn_name;
 
                 let fn_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                let codes = fn_source.get_string();
+                let mut codes = fn_source.get_string();
+                codes = attrs_string + &codes;
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
 
                 let decl = fn_sig.decl;
@@ -245,11 +270,11 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
 
                 // println!("{:#?}", self.hir_map.body(body_id));
 
-                let output_path = self.crate_path.join(format!("rfocxt_new/{}.txt", fn_name));
-                fs::create_dir_all(output_path.parent().unwrap()).unwrap();
-                let mut file = File::create(&output_path).unwrap();
-                file.write_all(format!("{:#?}", self.hir_map.body(body_id)).as_bytes())
-                    .unwrap();
+                // let output_path = self.crate_path.join(format!("rfocxt_new/{}.txt", fn_name));
+                // fs::create_dir_all(output_path.parent().unwrap()).unwrap();
+                // let mut file = File::create(&output_path).unwrap();
+                // file.write_all(format!("{:#?}", self.hir_map.body(body_id)).as_bytes())
+                //     .unwrap();
 
                 parse_body(
                     &self.tcx,
@@ -268,6 +293,12 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
             }
             ItemKind::Macro(..) => {
                 let macro_info = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = macro_info.get_string();
+                codes = attrs_string + &codes;
+                self.mod_contexts
+                    .last_mut()
+                    .unwrap()
+                    .add_macro(macro_info, codes);
             }
             ItemKind::Mod(a_mod) => {
                 // intravisit::walk_item(self, i);
@@ -275,10 +306,12 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
             }
             ItemKind::TyAlias(ty, generics) => {
                 let ty_alias_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = ty_alias_source.get_string();
+                codes = attrs_string + &codes;
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
-                    .add_ty_alias(ty_alias_source);
+                    .add_ty_alias(ty_alias_source, codes);
 
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 recursively_parse_ty(&self.tcx, &ty, &mut ty_strings);
@@ -295,10 +328,12 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
             }
             ItemKind::OpaqueTy(opaque_ty) => {
                 let opaque_ty_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = opaque_ty_source.get_string();
+                codes = attrs_string + &codes;
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
-                    .add_opaque_ty(opaque_ty_source);
+                    .add_opaque_ty(opaque_ty_source, codes);
 
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 let generics = opaque_ty.generics;
@@ -336,8 +371,8 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 enum_name = self.tcx.crate_name(def_id.krate).to_string() + &enum_name;
 
                 let enum_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                let codes = enum_source.get_string();
-
+                let mut codes = enum_source.get_string();
+                codes = attrs_string + &codes;
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
 
                 for variant in enum_def.variants.iter() {
@@ -364,8 +399,8 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 struct_name = self.tcx.crate_name(def_id.krate).to_string() + &struct_name;
 
                 let struct_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                let codes = struct_source.get_string();
-
+                let mut codes = struct_source.get_string();
+                codes = attrs_string + &codes;
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 parse_variant_data(&self.tcx, &variant_data, &mut ty_strings);
                 for param in generics.params.iter() {
@@ -392,8 +427,8 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 union_name = self.tcx.crate_name(def_id.krate).to_string() + &union_name;
 
                 let union_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                let codes = union_source.get_string();
-
+                let mut codes = union_source.get_string();
+                codes = attrs_string + &codes;
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 parse_variant_data(&self.tcx, &variant_data, &mut ty_strings);
                 for param in generics.params.iter() {
@@ -417,13 +452,14 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 trait_name = self.tcx.crate_name(def_id.krate).to_string() + &trait_name;
 
                 let trait_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                let codes = trait_source.get_string();
-
+                let mut codes = trait_source.get_string();
+                codes = attrs_string + &codes;
                 let mut types: BTreeSet<InnerTypeItem> = BTreeSet::new();
                 let mut consts: BTreeSet<InnerConstItem> = BTreeSet::new();
                 let mut fns: BTreeSet<InnerFnItem> = BTreeSet::new();
 
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
+                ty_strings.insert(trait_name.clone());
                 for param in generics.params.iter() {
                     parse_generic_param(&self.tcx, param, &mut ty_strings);
                 }
@@ -496,10 +532,12 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
             }
             ItemKind::TraitAlias(generics, generic_bounds) => {
                 let trait_alias_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = trait_alias_source.get_string();
+                codes = attrs_string + &codes;
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
-                    .add_trait_alias(trait_alias_source);
+                    .add_trait_alias(trait_alias_source, codes);
                 let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 for param in generics.params.iter() {
                     parse_generic_param(&self.tcx, param, &mut ty_strings);
@@ -517,12 +555,13 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
             }
             ItemKind::Impl(a_impl) => {
                 let impl_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                let codes = impl_source.get_string();
-
+                let mut codes = impl_source.get_string();
+                codes = attrs_string + &codes;
                 // println!("Ty: {:#?}", a_impl.self_ty);
-                // let def_id = a_impl.self_ty.hir_id.owner.to_def_id();
-                // let mut struct_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
-                // struct_name = self.tcx.crate_name(def_id.krate).to_string() + &struct_name;
+                let def_id = a_impl.self_ty.hir_id.owner.to_def_id();
+                let mut impl_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
+                impl_name = self.tcx.crate_name(def_id.krate).to_string() + &impl_name;
+                let mut ty_strings: BTreeSet<String> = BTreeSet::new();
 
                 let mut struct_name = String::new();
                 let mut ty = a_impl.self_ty;
@@ -570,6 +609,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                         );
                     }
                 }
+                ty_strings.insert(struct_name.clone());
 
                 let mut trait_name: Option<String> = None;
                 if let Some(trait_ref) = a_impl.of_trait {
@@ -578,14 +618,14 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                         self.tcx.def_path(def_id).to_string_no_crate_verbose();
                     trait_name_string =
                         self.tcx.crate_name(def_id.krate).to_string() + &trait_name_string;
-                    trait_name = Some(trait_name_string);
+                    trait_name = Some(trait_name_string.clone());
+                    ty_strings.insert(trait_name_string);
                 }
 
                 let mut types: BTreeSet<InnerTypeItem> = BTreeSet::new();
                 let mut consts: BTreeSet<InnerConstItem> = BTreeSet::new();
                 let mut fns: BTreeSet<InnerFnItem> = BTreeSet::new();
 
-                let mut ty_strings: BTreeSet<String> = BTreeSet::new();
                 let generics = a_impl.generics;
                 for param in generics.params.iter() {
                     parse_generic_param(&self.tcx, param, &mut ty_strings);
@@ -627,6 +667,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                     }
                 }
                 let impl_item = ImplItem {
+                    name: impl_name,
                     struct_name: struct_name,
                     trait_name: trait_name,
                     codes: codes,
