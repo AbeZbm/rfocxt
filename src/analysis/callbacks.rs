@@ -8,6 +8,8 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
+use crate::OUT_FILE_PATH;
+
 use super::hir_visitor::HirVisitor;
 use super::parse_context::ParseContext;
 
@@ -25,13 +27,20 @@ impl RfocxtCallbacks {
     }
 
     fn run_analysis<'tcx, 'compiler>(&mut self, tcx: TyCtxt<'tcx>) {
+        let out_dir = self.crate_path.join(OUT_FILE_PATH);
+        if out_dir.exists() {
+            fs::remove_dir_all(&out_dir).unwrap();
+        }
+
         let hir_map = tcx.hir();
         let mut visitor = HirVisitor::new(tcx, hir_map, self.crate_path.clone());
         hir_map.walk_toplevel_module(&mut visitor);
         let mod_contexts = visitor.get_complete_mod_contexts();
         // println!("hir_visitor\n {:#?}", mod_contexts);
 
-        let output_path = self.crate_path.join("rfocxt_new/context.txt");
+        let output_path = self
+            .crate_path
+            .join(format!("{}/context.txt", OUT_FILE_PATH));
         fs::create_dir_all(output_path.parent().unwrap()).unwrap();
         let mut file = File::create(&output_path).unwrap();
         file.write_all(format!("{:#?}", mod_contexts).as_bytes())

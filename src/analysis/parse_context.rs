@@ -19,6 +19,8 @@ use super::{
     },
 };
 
+use crate::OUT_FILE_PATH;
+
 fn clear_codes(codes: &mut String) {
     let left = codes.find('{').unwrap();
     let mut right = -1;
@@ -639,7 +641,7 @@ impl<'a> ParseContext<'a> {
 
                 let output_path = self
                     .crate_path
-                    .join(format!("rfocxt_new/{}.rs", fn_item.name));
+                    .join(format!("{}/{}.rs", OUT_FILE_PATH, fn_item.name));
                 fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                 let mut file = File::create(&output_path).unwrap();
                 file.write_all(s.as_bytes()).unwrap();
@@ -665,7 +667,7 @@ impl<'a> ParseContext<'a> {
 
                     let output_path = self
                         .crate_path
-                        .join(format!("rfocxt_new/{}.rs", trait_fn.name));
+                        .join(format!("{}/{}.rs", OUT_FILE_PATH, trait_fn.name));
                     fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                     let mut file = File::create(&output_path).unwrap();
                     file.write_all(s.as_bytes()).unwrap();
@@ -696,7 +698,7 @@ impl<'a> ParseContext<'a> {
 
                     let output_path = self
                         .crate_path
-                        .join(format!("rfocxt_new/{}.rs", impl_fn.name));
+                        .join(format!("{}/{}.rs", OUT_FILE_PATH, impl_fn.name));
                     fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                     let mut file = File::create(&output_path).unwrap();
                     file.write_all(s.as_bytes()).unwrap();

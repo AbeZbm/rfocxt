@@ -4,7 +4,6 @@ use super::parses::parse_generic_param;
 use super::parses::parse_q_path;
 use super::parses::recursively_parse_pat;
 use super::parses::recursively_parse_ty;
-use log::error;
 use rustc_hir::intravisit;
 use rustc_hir::intravisit::Visitor;
 use rustc_hir::Expr;

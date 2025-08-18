@@ -43,6 +43,8 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
+use crate::OUT_FILE_PATH;
+
 pub struct HirVisitor<'tcx> {
     tcx: TyCtxt<'tcx>,
     hir_map: Map<'tcx>,
@@ -185,7 +187,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
         // let hir_id = self.tcx.local_def_id_to_hir_id(i.item_id().owner_id.def_id);
         let hir_id = i.item_id().hir_id();
         let attrs = self.hir_map.attrs(hir_id);
-        error!("{:?}: {:#?}", hir_id, attrs);
+        // error!("{:?}: {:#?}", hir_id, attrs);
         let mut attrs_string = String::new();
         for attr in attrs {
             if let AttrKind::Normal(normal_attr) = &attr.kind {
@@ -270,7 +272,9 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
 
                 // println!("{:#?}", self.hir_map.body(body_id));
 
-                // let output_path = self.crate_path.join(format!("rfocxt_new/{}.txt", fn_name));
+                let output_path = self
+                    .crate_path
+                    .join(format!("{}/{}.txt", OUT_FILE_PATH, fn_name));
                 // fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                 // let mut file = File::create(&output_path).unwrap();
                 // file.write_all(format!("{:#?}", self.hir_map.body(body_id)).as_bytes())

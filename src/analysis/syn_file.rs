@@ -182,7 +182,6 @@ pub struct TraitFnSynItem {
 impl_eq_cmp_unique!(TraitFnSynItem);
 
 #[derive(Debug, Clone)]
-
 pub struct TraitSynItem {
     pub name: String,
     pub item: ItemTrait,

@@ -7,6 +7,8 @@ extern crate rustc_interface;
 extern crate rustc_middle;
 extern crate rustc_span;
 
+static OUT_FILE_PATH: &str = "rfocxt";
+
 pub mod utils;
 pub mod analysis {
     pub mod callbacks;

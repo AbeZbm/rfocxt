@@ -1,3 +1,5 @@
+use twox_hash::XxHash3_64;
+
 /// Copied from Miri
 /// Returns the "default sysroot" if no `--sysroot` flag is set.
 /// Should be a compile-time constant.
@@ -19,4 +21,11 @@ pub fn compile_time_sysroot() -> Option<String> {
             .expect("To build Miri without rustup, set the `RUST_SYSROOT` env var at build time")
             .to_owned(),
     })
+}
+
+pub fn encoded_name(s: &str) -> String {
+    let seed = rand::rng().random::<u64>();
+    let mut hasher = XxHash3_64::with_seed(seed);
+    s.hash(&mut hasher);
+    base62::encode(hasher.finish())
 }
