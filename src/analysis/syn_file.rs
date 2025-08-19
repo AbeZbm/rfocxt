@@ -3,9 +3,10 @@ use prettyplease::unparse;
 use quote::quote;
 use std::cmp::Ordering;
 use syn::{
-    parse2, parse_str, ImplItemConst, ImplItemFn, ImplItemType, Item, ItemConst, ItemEnum, ItemFn,
-    ItemImpl, ItemMacro, ItemStatic, ItemStruct, ItemTrait, ItemTraitAlias, ItemType, ItemUnion,
-    ItemUse, ReturnType, TraitItemConst, TraitItemFn, TraitItemType,
+    parse2, parse_str, ImplItemConst, ImplItemFn, ImplItemType, Item, ItemConst, ItemEnum,
+    ItemExternCrate, ItemFn, ItemImpl, ItemMacro, ItemStatic, ItemStruct, ItemTrait,
+    ItemTraitAlias, ItemType, ItemUnion, ItemUse, ReturnType, TraitItemConst, TraitItemFn,
+    TraitItemType,
 };
 
 macro_rules! impl_eq_cmp_unique {
@@ -39,6 +40,17 @@ macro_rules! impl_eq_cmp_unique {
             }
         }
     };
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternCrateSynItem {
+    pub item: ItemExternCrate,
+}
+
+impl ExternCrateSynItem {
+    fn to_item(&self) -> Item {
+        Item::ExternCrate(self.item.clone())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -464,6 +476,7 @@ impl Ord for ImplSynItem {
 
 pub struct SynFile {
     pub name: String,
+    pub extern_crates: Vec<ExternCrateSynItem>,
     pub uses: Vec<UseSynItem>,
     pub statics: Vec<StaticSynItem>,
     pub consts: Vec<ConstSynItem>,
@@ -481,6 +494,16 @@ pub struct SynFile {
 impl SynFile {
     pub fn new(mod_context: &ModContext) -> Self {
         let name = mod_context.name.clone();
+        let mut extern_crates: Vec<ExternCrateSynItem> = Vec::new();
+        for extern_crate_item in mod_context.extern_crates.iter() {
+            let item_extern_crate = parse_str::<ItemExternCrate>(&extern_crate_item.codes);
+            if let Ok(item_extern_crate) = item_extern_crate {
+                let extern_crate_syn_item = ExternCrateSynItem {
+                    item: item_extern_crate,
+                };
+                extern_crates.push(extern_crate_syn_item);
+            }
+        }
         let mut uses: Vec<UseSynItem> = Vec::new();
         for use_item in mod_context.uses.iter() {
             let item_use = parse_str::<ItemUse>(&use_item.codes);
@@ -541,6 +564,7 @@ impl SynFile {
 
         SynFile {
             name: name,
+            extern_crates: extern_crates,
             uses: uses,
             statics: statics,
             consts: consts,
@@ -571,6 +595,11 @@ impl SynFile {
         // pub trait_aliases: Vec<TraitAliasSynItem>,
         // pub impls: Vec<ImplSynItem>,
         let mut items: Vec<Item> = Vec::new();
+        items.extend(
+            self.extern_crates
+                .iter()
+                .map(|extern_crate_item| extern_crate_item.to_item()),
+        );
         items.extend(self.uses.iter().map(|use_item| use_item.to_item()));
         items.extend(self.statics.iter().map(|static_item| static_item.to_item()));
         items.extend(self.consts.iter().map(|const_item| const_item.to_item()));
