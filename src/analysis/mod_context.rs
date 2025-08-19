@@ -71,6 +71,13 @@ macro_rules! impl_eq_cmp_unique {
 }
 
 #[derive(Debug, Clone)]
+pub struct ExternCrateItem {
+    pub codes: String,
+    pub source_info: SourceInfo,
+}
+impl_eq_cmp!(ExternCrateItem);
+
+#[derive(Debug, Clone)]
 pub struct UseItem {
     pub codes: String,
     pub source_info: SourceInfo,
@@ -126,6 +133,7 @@ impl_eq_cmp!(OpaqueTyItem);
 pub struct EnumItem {
     pub name: String,
     pub codes: String,
+    pub derives: BTreeSet<String>,
     pub source_info: SourceInfo,
     pub applications: BTreeSet<String>,
 }
@@ -135,6 +143,7 @@ impl_eq_cmp_unique!(EnumItem);
 pub struct StructItem {
     pub name: String,
     pub codes: String,
+    pub derives: BTreeSet<String>,
     pub source_info: SourceInfo,
     pub applcaitions: BTreeSet<String>,
 }
@@ -144,6 +153,7 @@ impl_eq_cmp_unique!(StructItem);
 pub struct UnionItem {
     pub name: String,
     pub codes: String,
+    pub derives: BTreeSet<String>,
     pub source_info: SourceInfo,
     pub applications: BTreeSet<String>,
 }
@@ -210,6 +220,7 @@ impl_eq_cmp_unique!(ImplItem);
 #[derive(Debug, Clone)]
 pub struct ModContext {
     pub name: String,
+    pub extern_crates: BTreeSet<ExternCrateItem>,
     pub uses: BTreeSet<UseItem>,
     pub statics: BTreeSet<StaticItem>,
     pub consts: BTreeSet<ConstItem>,
@@ -230,6 +241,7 @@ impl ModContext {
     pub fn new(name: &String) -> Self {
         ModContext {
             name: name.clone(),
+            extern_crates: BTreeSet::new(),
             uses: BTreeSet::new(),
             statics: BTreeSet::new(),
             consts: BTreeSet::new(),
@@ -245,6 +257,18 @@ impl ModContext {
             impls: BTreeSet::new(),
             applications: BTreeSet::new(),
         }
+    }
+
+    pub fn add_extern_crate(&mut self, source_info: SourceInfo, codes: String) {
+        if source_info.get_string() == "" {
+            return;
+        }
+        info!("Visiting extern crate: {}", codes);
+        let extern_crate_item = ExternCrateItem {
+            codes: codes,
+            source_info: source_info,
+        };
+        self.extern_crates.insert(extern_crate_item);
     }
 
     pub fn add_use(&mut self, source_info: SourceInfo, codes: String) {
@@ -350,6 +374,96 @@ impl ModContext {
             info!("Visiting impl: {}", impl_item.struct_name);
         }
         self.impls.insert(impl_item);
+    }
+
+    pub fn add_derive(&mut self, name: String, derive: String) {
+        info!("Visiting derive: {} for {}", derive, name);
+        for struct_item in self.structs.iter() {
+            if struct_item.name == name {
+                let mut struct_item = struct_item.clone();
+                struct_item.derives.insert(derive);
+                self.structs.replace(struct_item);
+                return;
+            }
+        }
+        for enum_item in self.enums.iter() {
+            if enum_item.name == name {
+                let mut enum_item = enum_item.clone();
+                enum_item.derives.insert(derive);
+                self.enums.replace(enum_item);
+                return;
+            }
+        }
+        for union_item in self.unions.iter() {
+            if union_item.name == name {
+                let mut union_item = union_item.clone();
+                union_item.derives.insert(derive);
+                self.unions.replace(union_item);
+                return;
+            }
+        }
+    }
+
+    pub fn derive_to_codes(&mut self) {
+        let mut replace_list: Vec<StructItem> = Vec::new();
+        for struct_item in self.structs.iter() {
+            if struct_item.derives.is_empty() {
+                continue;
+            }
+            let mut taken_struct_item = struct_item.clone();
+            let derives = taken_struct_item
+                .derives
+                .iter()
+                .cloned()
+                .collect::<Vec<String>>()
+                .join(", ");
+            taken_struct_item.codes =
+                format!("#[derive({})]", derives) + "\n" + &taken_struct_item.codes;
+            replace_list.push(taken_struct_item);
+        }
+        for replace in replace_list.iter() {
+            self.structs.replace(replace.clone());
+        }
+
+        let mut replace_list: Vec<EnumItem> = Vec::new();
+        for enum_item in self.enums.iter() {
+            if enum_item.derives.is_empty() {
+                continue;
+            }
+            let mut taken_enum_item = enum_item.clone();
+            let derives = taken_enum_item
+                .derives
+                .iter()
+                .cloned()
+                .collect::<Vec<String>>()
+                .join(", ");
+            taken_enum_item.codes =
+                format!("#[derive({})]", derives) + "\n" + &taken_enum_item.codes;
+            replace_list.push(taken_enum_item);
+        }
+        for replace in replace_list.iter() {
+            self.enums.replace(replace.clone());
+        }
+
+        let mut replace_list: Vec<UnionItem> = Vec::new();
+        for union_item in self.unions.iter() {
+            if union_item.derives.is_empty() {
+                continue;
+            }
+            let mut taken_union_item = union_item.clone();
+            let derives = taken_union_item
+                .derives
+                .iter()
+                .cloned()
+                .collect::<Vec<String>>()
+                .join(", ");
+            taken_union_item.codes =
+                format!("#[derive({})]", derives) + "\n" + &taken_union_item.codes;
+            replace_list.push(taken_union_item);
+        }
+        for replace in replace_list.iter() {
+            self.unions.replace(replace.clone());
+        }
     }
 
     pub fn add_application(&mut self, application: String) {

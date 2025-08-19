@@ -17,6 +17,7 @@ use super::parses::parse_variant;
 use super::parses::parse_variant_data;
 use super::parses::parse_where_predicate;
 use super::parses::recursively_parse_ty;
+use crate::analysis::source_info;
 use crate::analysis::source_info::SourceInfo;
 use log::error;
 use log::info;
@@ -44,6 +45,13 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use crate::OUT_FILE_PATH;
+
+fn is_impl(codes: &str) -> bool {
+    match syn::parse_str::<syn::Item>(codes) {
+        Ok(syn::Item::Impl(_)) => true,
+        _ => false,
+    }
+}
 
 pub struct HirVisitor<'tcx> {
     tcx: TyCtxt<'tcx>,
@@ -94,7 +102,8 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
         for item_id in m.item_ids {
             self.visit_item(self.tcx.hir().item(*item_id));
         }
-        let mod_context = self.mod_contexts.pop().unwrap();
+        let mut mod_context = self.mod_contexts.pop().unwrap();
+        mod_context.derive_to_codes();
         self.complete_mod_contexts.push(mod_context);
         info!("Leaving module: {}", module_name);
     }
@@ -190,19 +199,41 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
         // error!("{:?}: {:#?}", hir_id, attrs);
         let mut attrs_string = String::new();
         for attr in attrs {
-            if let AttrKind::Normal(normal_attr) = &attr.kind {
-                let attr_source =
-                    SourceInfo::from_span(normal_attr.item.span(), self.tcx.sess.source_map());
-                attrs_string = attrs_string + &attr_source.get_string();
+            if let AttrKind::Normal(_) = &attr.kind {
+                // let attr_source = SourceInfo::from_span(attr.span, self.tcx.sess.source_map());
+                // error!("attr source: {:?}", attr_source);
+                // attrs_string = attrs_string + &attr_source.get_string();
+                let snippet = self
+                    .tcx
+                    .sess
+                    .source_map()
+                    .span_to_snippet(attr.span)
+                    .unwrap();
+                if snippet == "" || !snippet.contains("#[") {
+                    continue;
+                }
+                // error!("attr source: {}", snippet);
+                attrs_string = attrs_string + &snippet + "\n";
             }
             // let attr_item = attr.get_normal_item();
             // attrs_string = attrs_string + &format!("{:?}", attr_item) + "\n";
         }
         match i.kind {
+            ItemKind::ExternCrate(..) => {
+                let extern_crate_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+                let mut codes = extern_crate_source.get_string();
+                codes = attrs_string + &codes;
+                info!("Visiting extern crate: {}", codes);
+                self.mod_contexts
+                    .last_mut()
+                    .unwrap()
+                    .add_extern_crate(extern_crate_source, codes);
+            }
             ItemKind::Use(..) => {
                 let use_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = use_source.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting use: {}", codes);
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
@@ -212,6 +243,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let static_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = static_source.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting static: {}", codes);
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
@@ -230,6 +262,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let const_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = const_source.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting const: {}", codes);
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
@@ -254,7 +287,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let def_id = i.owner_id.to_def_id();
                 let mut fn_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
                 fn_name = self.tcx.crate_name(def_id.krate).to_string() + &fn_name;
-
+                info!("Visiting fn: {}", fn_name);
                 let fn_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = fn_source.get_string();
                 codes = attrs_string + &codes;
@@ -272,9 +305,9 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
 
                 // println!("{:#?}", self.hir_map.body(body_id));
 
-                let output_path = self
-                    .crate_path
-                    .join(format!("{}/{}.txt", OUT_FILE_PATH, fn_name));
+                // let output_path = self
+                //     .crate_path
+                //     .join(format!("{}/{}.txt", OUT_FILE_PATH, fn_name));
                 // fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                 // let mut file = File::create(&output_path).unwrap();
                 // file.write_all(format!("{:#?}", self.hir_map.body(body_id)).as_bytes())
@@ -299,6 +332,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let macro_info = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = macro_info.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting macro: {}", codes);
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
@@ -312,6 +346,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let ty_alias_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = ty_alias_source.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting tyalias: {}", codes);
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
@@ -334,6 +369,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let opaque_ty_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = opaque_ty_source.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting opaquety: {}", codes);
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
@@ -373,7 +409,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let def_id = i.owner_id.to_def_id();
                 let mut enum_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
                 enum_name = self.tcx.crate_name(def_id.krate).to_string() + &enum_name;
-
+                info!("Visiting enum: {}", enum_name);
                 let enum_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = enum_source.get_string();
                 codes = attrs_string + &codes;
@@ -392,6 +428,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let enum_item = EnumItem {
                     name: enum_name,
                     codes: codes,
+                    derives: BTreeSet::new(),
                     source_info: enum_source,
                     applications: ty_strings,
                 };
@@ -401,7 +438,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let def_id = i.owner_id.to_def_id();
                 let mut struct_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
                 struct_name = self.tcx.crate_name(def_id.krate).to_string() + &struct_name;
-
+                info!("Visiting struct: {}", struct_name);
                 let struct_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = struct_source.get_string();
                 codes = attrs_string + &codes;
@@ -417,6 +454,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let struct_item = StructItem {
                     name: struct_name,
                     codes: codes,
+                    derives: BTreeSet::new(),
                     source_info: struct_source,
                     applcaitions: ty_strings,
                 };
@@ -429,7 +467,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let def_id = i.owner_id.to_def_id();
                 let mut union_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
                 union_name = self.tcx.crate_name(def_id.krate).to_string() + &union_name;
-
+                info!("Visiting union: {}", union_name);
                 let union_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = union_source.get_string();
                 codes = attrs_string + &codes;
@@ -444,6 +482,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let union_item = UnionItem {
                     name: union_name,
                     codes: codes,
+                    derives: BTreeSet::new(),
                     source_info: union_source,
                     applications: ty_strings,
                 };
@@ -454,7 +493,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let def_id = i.owner_id.to_def_id();
                 let mut trait_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
                 trait_name = self.tcx.crate_name(def_id.krate).to_string() + &trait_name;
-
+                info!("Visiting trait: {}", trait_name);
                 let trait_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = trait_source.get_string();
                 codes = attrs_string + &codes;
@@ -538,6 +577,7 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let trait_alias_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = trait_alias_source.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting traitalias: {}", codes);
                 self.mod_contexts
                     .last_mut()
                     .unwrap()
@@ -561,6 +601,8 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                 let impl_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
                 let mut codes = impl_source.get_string();
                 codes = attrs_string + &codes;
+                info!("Visiting impl: {}", codes);
+
                 // println!("Ty: {:#?}", a_impl.self_ty);
                 let def_id = a_impl.self_ty.hir_id.owner.to_def_id();
                 let mut impl_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();
@@ -614,7 +656,13 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                     }
                 }
                 ty_strings.insert(struct_name.clone());
-
+                if !is_impl(&codes) {
+                    self.mod_contexts
+                        .last_mut()
+                        .unwrap()
+                        .add_derive(struct_name, codes);
+                    return;
+                }
                 let mut trait_name: Option<String> = None;
                 if let Some(trait_ref) = a_impl.of_trait {
                     let def_id = trait_ref.path.res.def_id();

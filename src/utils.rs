@@ -1,3 +1,6 @@
+use std::hash::{Hash, Hasher};
+
+use rand::Rng;
 use twox_hash::XxHash3_64;
 
 /// Copied from Miri

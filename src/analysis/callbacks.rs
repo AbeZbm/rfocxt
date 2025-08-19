@@ -58,7 +58,19 @@ impl rustc_driver::Callbacks for RfocxtCallbacks {
         info!("Source file: {}", self.source_name);
     }
 
-    fn after_expansion<'tcx>(
+    // fn after_expansion<'tcx>(
+    //     &mut self,
+    //     _compiler: &interface::Compiler,
+    //     _queries: &'tcx Queries<'tcx>,
+    // ) -> Compilation {
+    //     _queries
+    //         .global_ctxt()
+    //         .unwrap()
+    //         .enter(|tcx| self.run_analysis(tcx));
+    //     Compilation::Continue
+    // }
+
+    fn after_analysis<'tcx>(
         &mut self,
         _compiler: &interface::Compiler,
         _queries: &'tcx Queries<'tcx>,
