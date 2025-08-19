@@ -1,4 +1,4 @@
-use log::error;
+use log::{error, info};
 use rfocxt::utils::compile_time_sysroot;
 use simplelog::{ConfigBuilder, TermLogger};
 use std::{
@@ -112,6 +112,7 @@ fn in_cargo_rfocxt() {
             .get(0)
             .expect("Badly formatted cargo meradata: target::kind is an empty array")
             .to_string();
+        info!("Crate kind: {}", kind);
         let mut cmd = cargo();
         cmd.arg("check");
         match kind.as_str() {
