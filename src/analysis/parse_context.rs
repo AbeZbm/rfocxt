@@ -694,7 +694,7 @@ impl<'a> ParseContext<'a> {
 
                     let mut s = to_string(&syn_files);
 
-                    s = format!("{:#?}\n{:#?}\n", direct_applications, indirect_applications) + &s;
+                    // s = format!("{:#?}\n{:#?}\n", direct_applications, indirect_applications) + &s;
 
                     let output_path = self
                         .crate_path
