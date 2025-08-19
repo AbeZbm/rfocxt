@@ -19,7 +19,7 @@ use super::{
     },
 };
 
-use crate::OUT_FILE_PATH;
+use crate::{utils::encoded_name, OUT_FILE_PATH};
 
 fn clear_codes(codes: &mut String) {
     let left = codes.find('{').unwrap();
@@ -621,6 +621,7 @@ impl<'a> ParseContext<'a> {
     }
 
     pub fn parse_context(&self) {
+        let mut name_map: BTreeMap<String, String> = BTreeMap::new();
         for mod_context in self.mod_contexts.iter() {
             for fn_item in mod_context.fns.iter() {
                 let mut direct_applications: BTreeSet<String> = BTreeSet::new();
@@ -639,9 +640,11 @@ impl<'a> ParseContext<'a> {
 
                 let s = to_string(&syn_files);
 
+                let encoded_name = encoded_name(&fn_item.name);
+                name_map.insert(fn_item.name.to_string(), encoded_name.clone());
                 let output_path = self
                     .crate_path
-                    .join(format!("{}/{}.rs", OUT_FILE_PATH, fn_item.name));
+                    .join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
                 fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                 let mut file = File::create(&output_path).unwrap();
                 file.write_all(s.as_bytes()).unwrap();
@@ -665,9 +668,11 @@ impl<'a> ParseContext<'a> {
 
                     let s = to_string(&syn_files);
 
+                    let encoded_name = encoded_name(&trait_fn.name);
+                    name_map.insert(trait_fn.name.to_string(), encoded_name.clone());
                     let output_path = self
                         .crate_path
-                        .join(format!("{}/{}.rs", OUT_FILE_PATH, trait_fn.name));
+                        .join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
                     fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                     let mut file = File::create(&output_path).unwrap();
                     file.write_all(s.as_bytes()).unwrap();
@@ -692,19 +697,26 @@ impl<'a> ParseContext<'a> {
                     // error!("{}: {:#?}", impl_fn.name, syn_files);
                     self.parse_indirect_applications(&indirect_applications, &mut syn_files);
 
-                    let mut s = to_string(&syn_files);
+                    let s = to_string(&syn_files);
 
                     // s = format!("{:#?}\n{:#?}\n", direct_applications, indirect_applications) + &s;
 
+                    let encoded_name = encoded_name(&impl_fn.name);
+                    name_map.insert(impl_fn.name.to_string(), encoded_name.clone());
                     let output_path = self
                         .crate_path
-                        .join(format!("{}/{}.rs", OUT_FILE_PATH, impl_fn.name));
+                        .join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
                     fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                     let mut file = File::create(&output_path).unwrap();
                     file.write_all(s.as_bytes()).unwrap();
                 }
             }
         }
+        let name_map_path = self
+            .crate_path
+            .join(format!("{}/name_map.json", OUT_FILE_PATH));
+        let file = File::create(name_map_path).unwrap();
+        serde_json::to_writer_pretty(file, &name_map).unwrap();
     }
 }
 
