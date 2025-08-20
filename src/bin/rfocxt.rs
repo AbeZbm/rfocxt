@@ -4,6 +4,7 @@ extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_session;
 
+use log::warn;
 use rfocxt::analysis::callbacks::RfocxtCallbacks;
 use rfocxt::utils::compile_time_sysroot;
 use rustc_errors::emitter::HumanReadableErrorType;
@@ -34,6 +35,8 @@ fn main() {
             .enumerate()
             .map(|(i, arg)| arg.into_string().unwrap())
             .collect::<Vec<_>>();
+
+        warn!("rustc args: {:?}", rustc_args);
 
         if let Some(sysroot) = compile_time_sysroot() {
             let sysroot_flag = "--sysroot";
