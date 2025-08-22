@@ -4,7 +4,7 @@ extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_session;
 
-use log::warn;
+use log::{info, warn};
 use rfocxt::analysis::callbacks::RfocxtCallbacks;
 use rfocxt::utils::compile_time_sysroot;
 use rustc_errors::emitter::HumanReadableErrorType;
@@ -13,8 +13,18 @@ use rustc_session::config::ErrorOutputType;
 use rustc_session::EarlyDiagCtxt;
 use simplelog::{ConfigBuilder, TermLogger};
 use std::path::PathBuf;
+use std::process::Command;
 use std::{env, process::exit};
 use time::UtcOffset;
+
+fn delegate_to_real_rustc(args: &[String]) -> i32 {
+    let rustc_real = "/home/shg11186448/.cargo/bin/rustc";
+    let status = Command::new(rustc_real)
+        .args(&args[1..])
+        .status()
+        .expect("failed to run real rustc");
+    status.code().unwrap_or(1)
+}
 
 fn main() {
     let result = rustc_driver::catch_fatal_errors(move || {
@@ -36,7 +46,14 @@ fn main() {
             .map(|(i, arg)| arg.into_string().unwrap())
             .collect::<Vec<_>>();
 
-        warn!("rustc args: {:?}", rustc_args);
+        info!("rustc args: {:?}", rustc_args);
+
+        if rustc_args.iter().any(|a| a.starts_with("--print"))
+            || rustc_args.contains(&"--version".to_string())
+            || rustc_args.contains(&"-vV".to_string())
+        {
+            exit(delegate_to_real_rustc(&rustc_args));
+        }
 
         if let Some(sysroot) = compile_time_sysroot() {
             let sysroot_flag = "--sysroot";
@@ -44,6 +61,17 @@ fn main() {
                 rustc_args.push(sysroot_flag.to_string());
                 rustc_args.push(sysroot);
             }
+        }
+
+        let mut crate_dir = PathBuf::new();
+        let mut i = 0;
+        while i < rustc_args.len() {
+            if rustc_args[i] == "--crate-dir" {
+                crate_dir = rustc_args.remove(i + 1).into();
+                rustc_args.remove(i);
+                break;
+            }
+            i += 1;
         }
 
         if env::var_os("RFOCXT_BE_RUSTC").is_some() {
@@ -61,9 +89,7 @@ fn main() {
                 rustc_args.push(always_encode_mir.to_string());
             }
             rustc_args.push("-Cpanic=abort".to_string());
-
-            let env = env::var_os("RFOCXT_CRATE_DIR").unwrap();
-            let crate_dir = PathBuf::from(env);
+            warn!("parse crate: {:?}", crate_dir);
 
             let mut callbacks = RfocxtCallbacks::new(crate_dir);
             let run_compiler = rustc_driver::RunCompiler::new(&rustc_args, &mut callbacks);
