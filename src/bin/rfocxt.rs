@@ -63,20 +63,24 @@ fn main() {
             }
         }
 
-        let mut crate_dir = PathBuf::new();
-        let mut i = 0;
-        while i < rustc_args.len() {
-            if rustc_args[i] == "--crate-dir" {
-                crate_dir = rustc_args.remove(i + 1).into();
-                rustc_args.remove(i);
-                break;
-            }
-            i += 1;
-        }
+        // let mut crate_dir = PathBuf::new();
+        // let mut i = 0;
+        // while i < rustc_args.len() {
+        //     if rustc_args[i] == "--crate-dir" {
+        //         crate_dir = rustc_args.remove(i + 1).into();
+        //         rustc_args.remove(i);
+        //         break;
+        //     }
+        //     i += 1;
+        // }
 
-        if env::var_os("RFOCXT_BE_RUSTC").is_some() {
+        let source_file_dir = rustc_args[3].to_string();
+        let source_file_path = std::fs::canonicalize(PathBuf::from(&source_file_dir)).unwrap();
+        let crate_name = rustc_args[2].to_string();
+
+        if source_file_dir.contains("external") {
             let early_diag_ctxt = EarlyDiagCtxt::new(ErrorOutputType::HumanReadable(
-                HumanReadableErrorType::Default(ColorConfig::Auto),
+                HumanReadableErrorType::Default,ColorConfig::Auto,
             ));
             rustc_driver::init_rustc_env_logger(&early_diag_ctxt);
 
@@ -89,9 +93,15 @@ fn main() {
                 rustc_args.push(always_encode_mir.to_string());
             }
             rustc_args.push("-Cpanic=abort".to_string());
-            warn!("parse crate: {:?}", crate_dir);
+            let crate_path = source_file_path
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .to_path_buf();
+            warn!("parse crate: {:?}, crate name: {}", crate_path, crate_name);
 
-            let mut callbacks = RfocxtCallbacks::new(crate_dir);
+            let mut callbacks = RfocxtCallbacks::new(crate_path);
             let run_compiler = rustc_driver::RunCompiler::new(&rustc_args, &mut callbacks);
             let _ = run_compiler.run();
         }

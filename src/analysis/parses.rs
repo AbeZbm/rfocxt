@@ -13,6 +13,8 @@ use rustc_hir::PatKind;
 use rustc_hir::Path;
 use rustc_hir::QPath;
 use rustc_hir::Ty;
+use rustc_hir::Node;
+use rustc_hir::OpaqueTyOrigin;
 use rustc_hir::TyKind;
 use rustc_hir::Variant;
 use rustc_hir::VariantData;
@@ -63,14 +65,37 @@ pub fn recursively_parse_ty<'a, 'tcx>(
         TyKind::Path(q_path) => {
             parse_q_path(tcx, &q_path, ty_strings);
         }
-        TyKind::OpaqueDef(_, generic_args, _) => {
-            for generic_arg in generic_args.iter() {
-                match generic_arg {
-                    GenericArg::Type(inner_ty) => {
-                        recursively_parse_ty(tcx, inner_ty, ty_strings);
-                    }
-                    _ => {}
+        // TyKind::OpaqueDef(_, generic_args, _) => {
+        //     for generic_arg in generic_args.iter() {
+        //         match generic_arg {
+        //             GenericArg::Type(inner_ty) => {
+        //                 recursively_parse_ty(tcx, inner_ty, ty_strings);
+        //             }
+        //             _ => {}
+        //         }
+        //     }
+        // }
+        TyKind::OpaqueDef(opaque_ty) => {
+            for generic_bound in opaque_ty.bounds.iter() {
+                parse_generic_bound(tcx, generic_bound, ty_strings);
+            }
+            let mut local_def_id;
+            match opaque_ty.origin{
+                OpaqueTyOrigin::FnReturn{
+                    parent,..
+                }|
+                OpaqueTyOrigin::AsyncFn{
+                    parent,..
+                }|
+                OpaqueTyOrigin::TyAlias{
+                    parent,..
+                }=>{
+                    local_def_id=parent;
                 }
+            }
+            let node=tcx.hir_node_by_def_id(local_def_id);
+            if let Node::Ty(ty)=node{
+                recursively_parse_ty(tcx,ty,ty_strings);
             }
         }
         TyKind::TraitObject(poly_trait_refs, ..) => {
@@ -387,7 +412,7 @@ pub fn parse_generic_bound<'a, 'tcx>(
     ty_strings: &mut BTreeSet<String>,
 ) {
     match generic_bound {
-        GenericBound::Trait(poly_trait_ref, _) => {
+        GenericBound::Trait(poly_trait_ref) => {
             for bound_generic_param in poly_trait_ref.bound_generic_params.iter() {
                 parse_generic_param(tcx, bound_generic_param, ty_strings);
             }

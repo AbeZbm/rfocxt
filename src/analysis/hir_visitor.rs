@@ -365,46 +365,46 @@ impl<'tcx> Visitor<'tcx> for HirVisitor<'tcx> {
                     .unwrap()
                     .extend_application(ty_strings);
             }
-            ItemKind::OpaqueTy(opaque_ty) => {
-                let opaque_ty_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
-                let mut codes = opaque_ty_source.get_string();
-                codes = attrs_string + &codes;
-                info!("Visiting opaquety: {}", codes);
-                self.mod_contexts
-                    .last_mut()
-                    .unwrap()
-                    .add_opaque_ty(opaque_ty_source, codes);
+            // ItemKind::OpaqueTy(opaque_ty) => {
+            //     let opaque_ty_source = SourceInfo::from_span(i.span, self.tcx.sess.source_map());
+            //     let mut codes = opaque_ty_source.get_string();
+            //     codes = attrs_string + &codes;
+            //     info!("Visiting opaquety: {}", codes);
+            //     self.mod_contexts
+            //         .last_mut()
+            //         .unwrap()
+            //         .add_opaque_ty(opaque_ty_source, codes);
 
-                let mut ty_strings: BTreeSet<String> = BTreeSet::new();
-                let generics = opaque_ty.generics;
-                for param in generics.params.iter() {
-                    parse_generic_param(&self.tcx, param, &mut ty_strings);
-                }
-                for predicate in generics.predicates.iter() {
-                    parse_where_predicate(&self.tcx, predicate, &mut ty_strings);
-                }
+            //     let mut ty_strings: BTreeSet<String> = BTreeSet::new();
+            //     let generics = opaque_ty.generics;
+            //     for param in generics.params.iter() {
+            //         parse_generic_param(&self.tcx, param, &mut ty_strings);
+            //     }
+            //     for predicate in generics.predicates.iter() {
+            //         parse_where_predicate(&self.tcx, predicate, &mut ty_strings);
+            //     }
 
-                for bound in opaque_ty.bounds.iter() {
-                    match bound {
-                        GenericBound::Trait(poly_trait_ref, _) => {
-                            for bound_generic_param in poly_trait_ref.bound_generic_params.iter() {
-                                parse_generic_param(
-                                    &self.tcx,
-                                    bound_generic_param,
-                                    &mut ty_strings,
-                                );
-                            }
-                            let path = poly_trait_ref.trait_ref.path;
-                            parse_path(&self.tcx, &path, &mut ty_strings);
-                        }
-                        _ => {}
-                    }
-                }
-                self.mod_contexts
-                    .last_mut()
-                    .unwrap()
-                    .extend_application(ty_strings);
-            }
+            //     for bound in opaque_ty.bounds.iter() {
+            //         match bound {
+            //             GenericBound::Trait(poly_trait_ref, _) => {
+            //                 for bound_generic_param in poly_trait_ref.bound_generic_params.iter() {
+            //                     parse_generic_param(
+            //                         &self.tcx,
+            //                         bound_generic_param,
+            //                         &mut ty_strings,
+            //                     );
+            //                 }
+            //                 let path = poly_trait_ref.trait_ref.path;
+            //                 parse_path(&self.tcx, &path, &mut ty_strings);
+            //             }
+            //             _ => {}
+            //         }
+            //     }
+            //     self.mod_contexts
+            //         .last_mut()
+            //         .unwrap()
+            //         .extend_application(ty_strings);
+            // }
             ItemKind::Enum(enum_def, generics) => {
                 let def_id = i.owner_id.to_def_id();
                 let mut enum_name = self.tcx.def_path(def_id).to_string_no_crate_verbose();

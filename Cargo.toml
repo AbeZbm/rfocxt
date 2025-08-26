@@ -7,9 +7,6 @@ edition = "2021"
 rustc_private = true
 
 [[bin]]
-name = "cargo-rfocxt"
-
-[[bin]]
 name = "rfocxt"
 
 [dependencies]
