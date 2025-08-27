@@ -4,43 +4,42 @@ extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_session;
 
+use std::env;
+use std::path::PathBuf;
+use std::process::{Command, exit};
+
 use log::{info, warn};
 use rfocxt::analysis::callbacks::RfocxtCallbacks;
 use rfocxt::utils::compile_time_sysroot;
-use rustc_errors::emitter::HumanReadableErrorType;
 use rustc_errors::ColorConfig;
-use rustc_session::config::ErrorOutputType;
+use rustc_errors::emitter::HumanReadableErrorType;
 use rustc_session::EarlyDiagCtxt;
+use rustc_session::config::ErrorOutputType;
 use simplelog::{ConfigBuilder, TermLogger};
-use std::path::PathBuf;
-use std::process::Command;
-use std::{env, process::exit};
 use time::UtcOffset;
 
 fn delegate_to_real_rustc(args: &[String]) -> i32 {
     let rustc_real = "/home/shg11186448/.cargo/bin/rustc";
-    let status = Command::new(rustc_real)
-        .args(&args[1..])
-        .status()
-        .expect("failed to run real rustc");
+    let status =
+        Command::new(rustc_real).args(&args[1..]).status().expect("failed to run real rustc");
     status.code().unwrap_or(1)
 }
 
 fn main() {
-    let result = rustc_driver::catch_fatal_errors(move || {
-        let time_offset = UtcOffset::from_hms(8, 0, 0).unwrap();
-        let log_config = ConfigBuilder::new()
-            .set_location_level(log::LevelFilter::Error)
-            .set_time_offset(time_offset)
-            .build();
-        TermLogger::init(
-            log::LevelFilter::Info,
-            log_config,
-            simplelog::TerminalMode::Mixed,
-            simplelog::ColorChoice::Auto,
-        )
-        .unwrap();
+    let time_offset = UtcOffset::from_hms(8, 0, 0).unwrap();
+    let log_config = ConfigBuilder::new()
+        .set_location_level(log::LevelFilter::Error)
+        .set_time_offset(time_offset)
+        .build();
+    TermLogger::init(
+        log::LevelFilter::Info,
+        log_config,
+        simplelog::TerminalMode::Mixed,
+        simplelog::ColorChoice::Auto,
+    )
+    .unwrap();
 
+    let result = rustc_driver::catch_fatal_errors(move || {
         let mut rustc_args = env::args_os()
             .enumerate()
             .map(|(i, arg)| arg.into_string().unwrap())
@@ -73,14 +72,23 @@ fn main() {
         //     }
         //     i += 1;
         // }
+        let mut source_file_dir = rustc_args[3].to_string();
+        let mut crate_name = rustc_args[2].to_string();
+        for i in 0..rustc_args.len() {
+            if rustc_args[i].contains(".rs") {
+                source_file_dir = rustc_args[i].to_string();
+            }
+            if rustc_args[i].contains("--crate-name") {
+                crate_name = rustc_args[i + 1].to_string();
+            }
+        }
 
-        let source_file_dir = rustc_args[3].to_string();
         let source_file_path = std::fs::canonicalize(PathBuf::from(&source_file_dir)).unwrap();
-        let crate_name = rustc_args[2].to_string();
 
         if source_file_dir.contains("external") {
             let early_diag_ctxt = EarlyDiagCtxt::new(ErrorOutputType::HumanReadable(
-                HumanReadableErrorType::Default,ColorConfig::Auto,
+                HumanReadableErrorType::Default,
+                ColorConfig::Auto,
             ));
             rustc_driver::init_rustc_env_logger(&early_diag_ctxt);
 
@@ -93,12 +101,7 @@ fn main() {
                 rustc_args.push(always_encode_mir.to_string());
             }
             rustc_args.push("-Cpanic=abort".to_string());
-            let crate_path = source_file_path
-                .parent()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .to_path_buf();
+            let crate_path = source_file_path.parent().unwrap().parent().unwrap().to_path_buf();
             warn!("parse crate: {:?}, crate name: {}", crate_path, crate_name);
 
             let mut callbacks = RfocxtCallbacks::new(crate_path);

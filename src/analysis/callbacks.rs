@@ -1,17 +1,16 @@
-use log::info;
-use rustc_driver::Compilation;
-use rustc_interface::interface;
-use rustc_interface::Queries;
-use rustc_middle::ty::TyCtxt;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-use crate::OUT_FILE_PATH;
+use log::info;
+use rustc_driver::Compilation;
+use rustc_interface::{Queries, interface};
+use rustc_middle::ty::TyCtxt;
 
 use super::hir_visitor::HirVisitor;
 use super::parse_context::ParseContext;
+use crate::OUT_FILE_PATH;
 
 pub struct RfocxtCallbacks {
     pub source_name: String,
@@ -20,10 +19,7 @@ pub struct RfocxtCallbacks {
 
 impl RfocxtCallbacks {
     pub fn new(crate_path: PathBuf) -> Self {
-        Self {
-            source_name: String::new(),
-            crate_path: crate_path,
-        }
+        Self { source_name: String::new(), crate_path: crate_path }
     }
 
     fn run_analysis<'tcx, 'compiler>(&mut self, tcx: TyCtxt<'tcx>) {
@@ -38,13 +34,10 @@ impl RfocxtCallbacks {
         let mod_contexts = visitor.get_complete_mod_contexts();
         // println!("hir_visitor\n {:#?}", mod_contexts);
 
-        let output_path = self
-            .crate_path
-            .join(format!("{}/context.txt", OUT_FILE_PATH));
+        let output_path = self.crate_path.join(format!("{}/context.txt", OUT_FILE_PATH));
         fs::create_dir_all(output_path.parent().unwrap()).unwrap();
         let mut file = File::create(&output_path).unwrap();
-        file.write_all(format!("{:#?}", mod_contexts).as_bytes())
-            .unwrap();
+        file.write_all(format!("{:#?}", mod_contexts).as_bytes()).unwrap();
 
         let parse_context = ParseContext::new(self.crate_path.clone(), &mod_contexts);
         parse_context.parse_context();
@@ -58,7 +51,16 @@ impl rustc_driver::Callbacks for RfocxtCallbacks {
         info!("Source file: {}", self.source_name);
     }
 
-    // fn after_expansion<'tcx>(
+    fn after_expansion<'tcx>(
+        &mut self,
+        _compiler: &interface::Compiler,
+        _queries: &'tcx Queries<'tcx>,
+    ) -> Compilation {
+        _queries.global_ctxt().unwrap().enter(|tcx| self.run_analysis(tcx));
+        Compilation::Continue
+    }
+
+    // fn after_analysis<'tcx>(
     //     &mut self,
     //     _compiler: &interface::Compiler,
     //     _queries: &'tcx Queries<'tcx>,
@@ -69,16 +71,4 @@ impl rustc_driver::Callbacks for RfocxtCallbacks {
     //         .enter(|tcx| self.run_analysis(tcx));
     //     Compilation::Continue
     // }
-
-    fn after_analysis<'tcx>(
-        &mut self,
-        _compiler: &interface::Compiler,
-        _queries: &'tcx Queries<'tcx>,
-    ) -> Compilation {
-        _queries
-            .global_ctxt()
-            .unwrap()
-            .enter(|tcx| self.run_analysis(tcx));
-        Compilation::Continue
-    }
 }

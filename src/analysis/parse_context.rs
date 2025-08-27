@@ -1,25 +1,21 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fs::{self, File},
-    io::Write,
-    path::PathBuf,
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::PathBuf;
 
 use log::error;
 use syn::{
-    parse_str, ImplItemFn, ItemEnum, ItemFn, ItemStruct, ItemTrait, ItemUnion, TraitItem,
-    TraitItemConst, TraitItemFn, TraitItemType,
+    ImplItemFn, ItemEnum, ItemFn, ItemStruct, ItemTrait, ItemUnion, TraitItem, TraitItemConst,
+    TraitItemFn, TraitItemType, parse_str,
 };
 
-use super::{
-    mod_context::ModContext,
-    syn_file::{
-        EnumSynItem, FnSynItem, ImplFnSynItem, ImplSynItem, StructSynItem, SynApplication, SynFile,
-        TraitConstSynItem, TraitFnSynItem, TraitSynItem, TraitTypeSynItem, UnionSynItem,
-    },
+use super::mod_context::ModContext;
+use super::syn_file::{
+    EnumSynItem, FnSynItem, ImplFnSynItem, ImplSynItem, StructSynItem, SynApplication, SynFile,
+    TraitConstSynItem, TraitFnSynItem, TraitSynItem, TraitTypeSynItem, UnionSynItem,
 };
-
-use crate::{utils::encoded_name, OUT_FILE_PATH};
+use crate::OUT_FILE_PATH;
+use crate::utils::encoded_name;
 
 fn clear_codes(codes: &mut String) {
     let left = codes.find('{').unwrap();
@@ -100,10 +96,7 @@ pub struct ParseContext<'a> {
 
 impl<'a> ParseContext<'a> {
     pub fn new(crate_path: PathBuf, mod_contexts: &'a Vec<ModContext>) -> Self {
-        ParseContext {
-            crate_path: crate_path,
-            mod_contexts: mod_contexts,
-        }
+        ParseContext { crate_path: crate_path, mod_contexts: mod_contexts }
     }
 
     fn get_direct_item(&self, application: &String) -> Option<(String, SynApplication)> {
@@ -642,9 +635,8 @@ impl<'a> ParseContext<'a> {
 
                 let encoded_name = encoded_name(&fn_item.name);
                 name_map.insert(fn_item.name.to_string(), encoded_name.clone());
-                let output_path = self
-                    .crate_path
-                    .join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
+                let output_path =
+                    self.crate_path.join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
                 fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                 let mut file = File::create(&output_path).unwrap();
                 file.write_all(s.as_bytes()).unwrap();
@@ -670,9 +662,8 @@ impl<'a> ParseContext<'a> {
 
                     let encoded_name = encoded_name(&trait_fn.name);
                     name_map.insert(trait_fn.name.to_string(), encoded_name.clone());
-                    let output_path = self
-                        .crate_path
-                        .join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
+                    let output_path =
+                        self.crate_path.join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
                     fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                     let mut file = File::create(&output_path).unwrap();
                     file.write_all(s.as_bytes()).unwrap();
@@ -703,18 +694,15 @@ impl<'a> ParseContext<'a> {
 
                     let encoded_name = encoded_name(&impl_fn.name);
                     name_map.insert(impl_fn.name.to_string(), encoded_name.clone());
-                    let output_path = self
-                        .crate_path
-                        .join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
+                    let output_path =
+                        self.crate_path.join(format!("{}/{}.rs", OUT_FILE_PATH, encoded_name));
                     fs::create_dir_all(output_path.parent().unwrap()).unwrap();
                     let mut file = File::create(&output_path).unwrap();
                     file.write_all(s.as_bytes()).unwrap();
                 }
             }
         }
-        let name_map_path = self
-            .crate_path
-            .join(format!("{}/name_map.json", OUT_FILE_PATH));
+        let name_map_path = self.crate_path.join(format!("{}/name_map.json", OUT_FILE_PATH));
         let file = File::create(name_map_path).unwrap();
         serde_json::to_writer_pretty(file, &name_map).unwrap();
     }

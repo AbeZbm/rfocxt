@@ -1,13 +1,14 @@
-use super::mod_context::{ImplItem, ModContext, TraitItem};
+use std::cmp::Ordering;
+
 use prettyplease::unparse;
 use quote::quote;
-use std::cmp::Ordering;
 use syn::{
-    parse2, parse_str, ImplItemConst, ImplItemFn, ImplItemType, Item, ItemConst, ItemEnum,
-    ItemExternCrate, ItemFn, ItemImpl, ItemMacro, ItemStatic, ItemStruct, ItemTrait,
-    ItemTraitAlias, ItemType, ItemUnion, ItemUse, ReturnType, TraitItemConst, TraitItemFn,
-    TraitItemType,
+    ImplItemConst, ImplItemFn, ImplItemType, Item, ItemConst, ItemEnum, ItemExternCrate, ItemFn,
+    ItemImpl, ItemMacro, ItemStatic, ItemStruct, ItemTrait, ItemTraitAlias, ItemType, ItemUnion,
+    ItemUse, ReturnType, TraitItemConst, TraitItemFn, TraitItemType, parse_str, parse2,
 };
+
+use super::mod_context::{ImplItem, ModContext, TraitItem};
 
 macro_rules! impl_eq_cmp_unique {
     ($struct:ident) => {
@@ -216,18 +217,14 @@ impl TraitSynItem {
             for trait_type in trait_item.types.iter() {
                 let item_trait_type = parse_str::<TraitItemType>(&trait_type.codes);
                 if let Ok(item_trait_type) = item_trait_type {
-                    let trait_type_syn_item = TraitTypeSynItem {
-                        item: item_trait_type,
-                    };
+                    let trait_type_syn_item = TraitTypeSynItem { item: item_trait_type };
                     types.push(trait_type_syn_item);
                 }
             }
             for trait_const in trait_item.consts.iter() {
                 let item_trait_const = parse_str::<TraitItemConst>(&trait_const.codes);
                 if let Ok(item_trait_const) = item_trait_const {
-                    let trait_const_syn_item = TraitConstSynItem {
-                        item: item_trait_const,
-                    };
+                    let trait_const_syn_item = TraitConstSynItem { item: item_trait_const };
                     consts.push(trait_const_syn_item);
                 }
             }
@@ -237,10 +234,8 @@ impl TraitSynItem {
                     if let Some(default) = &mut item_trait_fn.default {
                         default.stmts.clear();
                     }
-                    let trait_fn_syn_item = TraitFnSynItem {
-                        name: trait_fn.name.clone(),
-                        item: item_trait_fn,
-                    };
+                    let trait_fn_syn_item =
+                        TraitFnSynItem { name: trait_fn.name.clone(), item: item_trait_fn };
                     fns.push(trait_fn_syn_item);
                 }
             }
@@ -274,12 +269,10 @@ impl TraitSynItem {
     fn to_item(&self) -> Item {
         let mut item = self.item.clone();
         for trait_type in self.types.iter() {
-            item.items
-                .push(syn::TraitItem::Type(trait_type.item.clone()));
+            item.items.push(syn::TraitItem::Type(trait_type.item.clone()));
         }
         for trait_const in self.consts.iter() {
-            item.items
-                .push(syn::TraitItem::Const(trait_const.item.clone()));
+            item.items.push(syn::TraitItem::Const(trait_const.item.clone()));
         }
         for trait_fn in self.fns.iter() {
             item.items.push(syn::TraitItem::Fn(trait_fn.item.clone()));
@@ -351,18 +344,14 @@ impl ImplSynItem {
             for impl_type in impl_item.types.iter() {
                 let item_impl_type = parse_str::<ImplItemType>(&impl_type.codes);
                 if let Ok(item_impl_type) = item_impl_type {
-                    let impl_type_syn_item = ImplTypeSynItem {
-                        item: item_impl_type,
-                    };
+                    let impl_type_syn_item = ImplTypeSynItem { item: item_impl_type };
                     types.push(impl_type_syn_item);
                 }
             }
             for impl_const in impl_item.consts.iter() {
                 let item_impl_const = parse_str::<ImplItemConst>(&impl_const.codes);
                 if let Ok(item_impl_const) = item_impl_const {
-                    let impl_const_syn_item = ImplConstSynItem {
-                        item: item_impl_const,
-                    };
+                    let impl_const_syn_item = ImplConstSynItem { item: item_impl_const };
                     consts.push(impl_const_syn_item);
                 }
             }
@@ -378,10 +367,8 @@ impl ImplSynItem {
                             item_impl_fn.block.stmts.clear();
                         }
                     }
-                    let impl_fn_syn_item = ImplFnSynItem {
-                        name: impl_fn.name.clone(),
-                        item: item_impl_fn,
-                    };
+                    let impl_fn_syn_item =
+                        ImplFnSynItem { name: impl_fn.name.clone(), item: item_impl_fn };
                     fns.push(impl_fn_syn_item);
                 }
             }
@@ -418,8 +405,7 @@ impl ImplSynItem {
             item.items.push(syn::ImplItem::Type(impl_type.item.clone()));
         }
         for impl_const in self.consts.iter() {
-            item.items
-                .push(syn::ImplItem::Const(impl_const.item.clone()));
+            item.items.push(syn::ImplItem::Const(impl_const.item.clone()));
         }
         for impl_fn in self.fns.iter() {
             item.items.push(syn::ImplItem::Fn(impl_fn.item.clone()));
@@ -498,9 +484,7 @@ impl SynFile {
         for extern_crate_item in mod_context.extern_crates.iter() {
             let item_extern_crate = parse_str::<ItemExternCrate>(&extern_crate_item.codes);
             if let Ok(item_extern_crate) = item_extern_crate {
-                let extern_crate_syn_item = ExternCrateSynItem {
-                    item: item_extern_crate,
-                };
+                let extern_crate_syn_item = ExternCrateSynItem { item: item_extern_crate };
                 extern_crates.push(extern_crate_syn_item);
             }
         }
@@ -555,9 +539,7 @@ impl SynFile {
         for trait_alias in mod_context.trait_aliases.iter() {
             let item_trait_alias = parse_str::<ItemTraitAlias>(&trait_alias.codes);
             if let Ok(item_trait_alias) = item_trait_alias {
-                let trait_alias_syn_item = TraitAliasSynItem {
-                    item: item_trait_alias,
-                };
+                let trait_alias_syn_item = TraitAliasSynItem { item: item_trait_alias };
                 trait_aliases.push(trait_alias_syn_item);
             }
         }
@@ -595,30 +577,19 @@ impl SynFile {
         // pub trait_aliases: Vec<TraitAliasSynItem>,
         // pub impls: Vec<ImplSynItem>,
         let mut items: Vec<Item> = Vec::new();
-        items.extend(
-            self.extern_crates
-                .iter()
-                .map(|extern_crate_item| extern_crate_item.to_item()),
-        );
+        items
+            .extend(self.extern_crates.iter().map(|extern_crate_item| extern_crate_item.to_item()));
         items.extend(self.uses.iter().map(|use_item| use_item.to_item()));
         items.extend(self.statics.iter().map(|static_item| static_item.to_item()));
         items.extend(self.consts.iter().map(|const_item| const_item.to_item()));
         items.extend(self.fns.iter().map(|fn_item| fn_item.to_item()));
-        items.extend(self.macros.iter().map(|macro_item| macro_item.to_item()));
-        items.extend(
-            self.ty_aliases
-                .iter()
-                .map(|ty_alias_item| ty_alias_item.to_item()),
-        );
+        // items.extend(self.macros.iter().map(|macro_item| macro_item.to_item()));
+        items.extend(self.ty_aliases.iter().map(|ty_alias_item| ty_alias_item.to_item()));
         items.extend(self.enums.iter().map(|enum_item| enum_item.to_item()));
         items.extend(self.structs.iter().map(|struct_item| struct_item.to_item()));
         items.extend(self.unions.iter().map(|union_item| union_item.to_item()));
         items.extend(self.traits.iter().map(|trait_item| trait_item.to_item()));
-        items.extend(
-            self.trait_aliases
-                .iter()
-                .map(|trait_alias_item| trait_alias_item.to_item()),
-        );
+        items.extend(self.trait_aliases.iter().map(|trait_alias_item| trait_alias_item.to_item()));
         items.extend(self.impls.iter().map(|impl_item| impl_item.to_item()));
 
         let tokens = quote! {#(#items)*};
